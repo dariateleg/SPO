@@ -1,29 +1,31 @@
 #!/bin/bash
-dir=$1
-#в переменную dir заносим путь к каталогу, в котором расположены файлы
+files=$(find "$1" -type f)
 vals=""
-#создаем переменную для хранения длительности видео-файлов
-for file in $dir/*; do 
-	videol=$(ffprobe -i "$file" -show_entries format=duration -v quiet -of csv="p=0"); 
-	vals=$vals" "$videol
+dates=""
+#создаем переменные для хранения длительности видео- аудиофайлов
+for file in $files; do
+	videol=$(ffprobe -i "$file" -sexagesimal -show_entries format=duration -v quiet -of csv="p=0"); 
+	if [[ $videol == "" ]]; then
+		videol="0"
+	fi
+	vals=$vals" "$videol;
+	dates=$dates""$(stat -c %z "$file")"|";
 done
 #в цикле проходимся по каждому файлу из заданной директории и записываем длительность в переменную vals
-
-ls -lh $dir |
-sed 's/\./ /g' |
+find $1 -type f -exec stat -c '%n|%s' {} + |
+sed 's/\./|/g' |
 sed 's/,/\./g' |
-awk -v a="$vals" '
+awk -F "|" -v a="$vals" -v b="$dates" '
 BEGIN {
-split(a,list," ")
+split(a,list," ");
+split(b,dates,"|");
+print "abs path + name\ttype\tsize (bytes)\tchanged date\tvideo or audio length (h.m.s.ms)";
 }
 {
-if (NR==1)
-	print "name\ttype\tsize\tdate\tmonth\tyear\tvideo length";
+if ($2=="avi" || $2=="mp4" || $2=="mp3")
+	print $1"\t"$2"\t"$3"\t"dates[NR]"\t"list[NR];
 else
-	if ($10=="avi" || $10=="mp4")
-		print $9"\t"$10"\t"$5"\t"$7"\t"$6"\t"$8"\t"list[NR-1];
-	else
-		print $9"\t"$10"\t"$5"\t"$7"\t"$6"\t"$8"\t";
+	print $1"\t"$2"\t"$3"\t"dates[NR]"\t";
 }' > ~/excel.xls
 #с помощью ls получаем информацию о файлах из директории, форматируем, заменяя точки на пробел 
 #(для отделения нового столбца с расширениями файлов), заменяем запятые на точки, в переменную а передаем строку с длительностью, 
